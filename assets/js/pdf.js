@@ -27,24 +27,53 @@ const C = {
 const STATUS_TEXT = {
   pending: "Pending",
   in_progress: "In Progress",
+
   done: "Done",
   config_done: "Configuration Done",
   installation_done: "Installation Done",
+
   issue: "Issue",
   blocked: "Blocked",
 };
+
 const STATUS_COLOR = {
   pending: C.statusGray,
   in_progress: C.statusAmber,
+
   done: C.statusGreen,
   config_done: C.statusGreen,
   installation_done: C.statusGreen,
+
   issue: C.statusRed,
   blocked: C.statusRed,
 };
+function statusLabel(v) {
+  const map = {
+    config_done: "Configuration Done",
+    installation_done: "Installation Done",
+    done: "Done",
+    in_progress: "In Progress",
+    issue: "Issue",
+    blocked: "Blocked",
+    pending: "Pending",
+  };
 
-function statusLabel(v) { return STATUS_TEXT[v] || v || "—"; }
-function statusColor(v) { return STATUS_COLOR[v] || C.statusGray; }
+  return map[v] || v || "—";
+}
+
+function statusColor(v) {
+  const map = {
+    config_done: C.statusGreen,
+    installation_done: C.statusGreen,
+    done: C.statusGreen,
+    in_progress: C.statusAmber,
+    issue: C.statusRed,
+    blocked: C.statusRed,
+    pending: C.statusGray,
+  };
+
+  return map[v] || C.statusGray;
+}
 
 // jsPDF factory
 function newDoc() {
@@ -298,10 +327,26 @@ function drawUnitCard(doc, zone, unit, y) {
   doc.line(ML, y + cardH_header, ML + CW, y + cardH_header);
 
   // Zone label (left)
-  doc.setTextColor(...C.textMuted);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.text(`Zone ${zone.code}`, ML + 14, y + 21);
+doc.setFillColor(...sc);
+doc.roundedRect(
+  fx + 8,
+  fy + 6,
+  130,
+  cellH - 12,
+  4,
+  4,
+  "F"
+);
+
+doc.setTextColor(255,255,255);
+doc.setFont("helvetica", "bold");
+doc.setFontSize(9);
+doc.text(
+  statusLabel(field.val),
+  fx + 73,
+  fy + cellH / 2 + 3,
+  { align: "center" }
+);
 
   // Unit ID (right) — amber bold large
   doc.setTextColor(...C.accent);
