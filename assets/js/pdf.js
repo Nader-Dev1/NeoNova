@@ -258,14 +258,10 @@ async function loadImageAsDataUrl(url) {
 // ============================================================
 
 
-function fieldText(doc, value) {
-  if (value == null || value === "") return "—";
-  return String(value);
-}
-
 function statusTextCompact(v) {
   return statusLabel(v);
 }
+
 
 function unitRowLine(unit) {
   // B) Status fields only + Overall (no notes/AP patch ports field expansion required)
@@ -277,7 +273,7 @@ function unitRowLine(unit) {
 }
 
 function unitRowAltLine(unit) {
-  // include AP patch panel ports if present (still “status row”)
+  // include AP patch panel ports if present
   const ports = unit.ap_patch_status ? String(unit.ap_patch_status) : "—";
   return `AP Patch Ports: ${ports}`;
 }
@@ -285,9 +281,8 @@ function unitRowAltLine(unit) {
 // ============================================================
 // EXPORT: Single Unit PDF (Compact row + photos under it)
 // ============================================================
-
-// ============================================================
 export async function exportUnitPdf(zone, unit) {
+
   const doc = newDoc();
 
   // Neutral header still okay, but keep body monochrome.
@@ -330,19 +325,20 @@ export async function exportUnitPdf(zone, unit) {
 
     let col = 0;
     for (const photo of photos) {
-      if (y + thumbH > PH - 90) {
-        // finish current page footer later; just add a new page
+      // If the next thumbnail row doesn't fit, move to a new page
+      if (y + thumbH > PH - 90 && (col > 0 || y !== 85)) {
         doc.addPage();
         drawHeader(doc, zone, `Unit ${unit.unit_code} - Photos`);
         y = 85;
-        // single-line again for context
+        // keep it minimal: re-draw just Unit code line
         doc.setTextColor(30, 30, 30);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
+        doc.setFontSize(12);
         doc.text(`Unit ${unit.unit_code}`, ML, y);
         y += 16;
         col = 0;
       }
+
 
       const px = ML + col * (thumbW + gap);
       const dataUrl = await loadImageAsDataUrl(photo.url);
@@ -453,7 +449,8 @@ export async function exportZonePdf(zone, units) {
 
       let col = 0;
       for (const photo of photos) {
-        if (y + thumbH > PH - 90) {
+        // If the next thumbnail doesn't fit, move to a new page
+        if (y + thumbH > PH - 90 && (col > 0 || y !== 85)) {
           doc.addPage();
           drawHeader(doc, zone, `Unit ${unit.unit_code} - Photos`);
           y = 85;
@@ -461,12 +458,13 @@ export async function exportZonePdf(zone, units) {
           // keep it minimal on continuation page
           doc.setTextColor(30, 30, 30);
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(14);
+          doc.setFontSize(12);
           doc.text(`Unit ${unit.unit_code}`, ML, y);
           y += 16;
 
           col = 0;
         }
+
 
         const px = ML + col * (thumbW + gap);
         const dataUrl = await loadImageAsDataUrl(photo.url);
