@@ -25,19 +25,22 @@ const C = {
 };
 
 const STATUS_TEXT = {
-  pending:      "Not Started",
-  in_progress:  "In Progress",
-  done:         "Configuration Done",
-  issue:        "Issue",
-  blocked:      "Blocked",
+  pending: "Pending",
+  in_progress: "In Progress",
+  done: "Done",
+  config_done: "Configuration Done",
+  installation_done: "Installation Done",
+  issue: "Issue",
+  blocked: "Blocked",
 };
-
 const STATUS_COLOR = {
-  pending:      C.statusGray,
-  in_progress:  C.statusAmber,
-  done:         C.statusGreen,
-  issue:        C.statusRed,
-  blocked:      C.statusRed,
+  pending: C.statusGray,
+  in_progress: C.statusAmber,
+  done: C.statusGreen,
+  config_done: C.statusGreen,
+  installation_done: C.statusGreen,
+  issue: C.statusRed,
+  blocked: C.statusRed,
 };
 
 function statusLabel(v) { return STATUS_TEXT[v] || v || "—"; }
@@ -125,8 +128,7 @@ function drawFooter(doc, pageNum, totalPages) {
 // ============================================================
 function drawSummaryCards(doc, units, y) {
   const total     = units.length;
-  const done      = units.filter(u => u.overall_status === "done").length;
-  const inProg    = units.filter(u => u.overall_status === "in_progress").length;
+  const done = units.filter(u =>u.overall_status === "done" ||u.overall_status === "config_done" || u.overall_status === "installation_done").length;  const inProg    = units.filter(u => u.overall_status === "in_progress").length;
   const issue     = units.filter(u => u.overall_status === "issue").length;
   const blocked   = units.filter(u => u.overall_status === "blocked").length;
   const pct       = total ? Math.round((done / total) * 100) : 0;
@@ -141,7 +143,7 @@ function drawSummaryCards(doc, units, y) {
   ];
 
   const cardW  = (CW - 5 * 8) / 6;  // 6 cards with 8pt gap
-  const cardH  = 56;
+  const cardH  = 75;
   let cx = ML;
 
   cards.forEach(card => {
@@ -153,7 +155,7 @@ function drawSummaryCards(doc, units, y) {
 
     // Number
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
+    doc.setFontSize(26);
     doc.setTextColor(...card.color);
     doc.text(card.num, cx + cardW / 2, y + 28, { align: "center" });
 
@@ -278,7 +280,7 @@ function drawUnitsTable(doc, units, y) {
 // ============================================================
 function drawUnitCard(doc, zone, unit, y) {
   const cardH_header = 32;
-  const gridH        = 68;   // 2 rows × 34
+  const gridH        = 90;  
   const cardPad      = 10;
 
   // Card outer border
@@ -332,11 +334,18 @@ function drawUnitCard(doc, zone, unit, y) {
     // Cell border
     doc.setDrawColor(...C.borderGray);
     doc.setLineWidth(0.6);
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(fx, fy, cellW, cellH, 4, 4, "FD");
+  doc.setFillColor(...sc);
+doc.roundedRect(
+  fx + 6,
+  fy + 6,
+  120,
+  cellH - 12,
+  4,
+  4,
+  "F"
+);
+doc.setTextColor(255,255,255);
 
-    // Status text (left, green/colored)
-    doc.setTextColor(...sc);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9.5);
     doc.text(statusLabel(field.val), fx + 10, fy + cellH / 2 + 3.5);
@@ -397,7 +406,7 @@ async function drawPhotos(doc, zone, unit, photos, y) {
   const thumbW  = (CW - 3 * 8) / 4;   // 4 per row
   const thumbH  = thumbW * 0.75;       // 4:3 ratio
   const gap     = 8;
-  const perRow  = 4;
+  const perRow  = 2;
   let col = 0;
 
   for (const photo of photos) {
