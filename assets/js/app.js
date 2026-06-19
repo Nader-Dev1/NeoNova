@@ -373,12 +373,12 @@ async function navigateUnitDetail(unitId) {
 
 document.getElementById("saveUnitBtn").addEventListener("click", async () => {
   const unit = state.currentUnit;
-  // Validate AP Patch: must be 4 or 5 ports in format "Port X, Port Y, ..."
+  // Validate AP Patch: accept numbers separated by commas
   const apPatchRaw = document.getElementById("f_ap_patch").value.trim();
   if (apPatchRaw) {
-    const apRe = /^Port \d{1,5}(, Port \d{1,5}){3,4}$/;
+    const apRe = /^\d{1,5}(,\s?\d{1,5})*$/;
     if (!apRe.test(apPatchRaw)) {
-      showToast("AP Patch must be 4 or 5 ports (e.g. Port 12, Port 13, Port 14, Port 15)", true);
+      showToast("AP Patch: enter port numbers separated by commas (e.g. 12, 13, 14, 15)", true);
       return;
     }
   }
@@ -387,7 +387,6 @@ document.getElementById("saveUnitBtn").addEventListener("click", async () => {
     fortigate_status: document.getElementById("f_fortigate").value,
     fortiswitch_status: document.getElementById("f_fortiswitch").value,
     ap_status: document.getElementById("f_ap").value,
-    ap_patch_status: apPatchRaw || null,
     overall_status: document.getElementById("f_overall").value,
     notes: document.getElementById("f_notes").value.trim() || null,
   };
