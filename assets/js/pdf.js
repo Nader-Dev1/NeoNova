@@ -4,9 +4,8 @@
 // Clean, organized layout with professional color scheme
 // ============================================================
 
-import { fmtDate } from "./status.js";
-
 // Color palette: professional blue header, clean grays, vibrant status indicators
+
 const C = {
   headerBg:   [11, 61, 145],      // #0b3d91 dark blue
   headerText: [255, 255, 255],    // white
@@ -255,113 +254,112 @@ async function loadImageAsDataUrl(url) {
 }
 
 // ============================================================
-// EXPORT: Single Unit PDF
+// Helpers for compact “Unit Row + Photos under it” layout
+// ============================================================
+
+
+function fieldText(doc, value) {
+  if (value == null || value === "") return "—";
+  return String(value);
+}
+
+function statusTextCompact(v) {
+  return statusLabel(v);
+}
+
+function unitRowLine(unit) {
+  // B) Status fields only + Overall (no notes/AP patch ports field expansion required)
+  const fg = statusTextCompact(unit.fortigate_status);
+  const fs = statusTextCompact(unit.fortiswitch_status);
+  const ap = statusTextCompact(unit.ap_status);
+  const overall = statusTextCompact(unit.overall_status);
+  return `Unit ${unit.unit_code} | FG: ${fg} | FS: ${fs} | AP: ${ap} | Overall: ${overall}`;
+}
+
+function unitRowAltLine(unit) {
+  // include AP patch panel ports if present (still “status row”)
+  const ports = unit.ap_patch_status ? String(unit.ap_patch_status) : "—";
+  return `AP Patch Ports: ${ports}`;
+}
+
+// ============================================================
+// EXPORT: Single Unit PDF (Compact row + photos under it)
+// ============================================================
+
 // ============================================================
 export async function exportUnitPdf(zone, unit) {
   const doc = newDoc();
 
+  // Neutral header still okay, but keep body monochrome.
   drawHeader(doc, zone, `Unit ${unit.unit_code}`);
+
   let y = 85;
 
-  // Unit title (larger)
-  doc.setTextColor(...C.headerBg);
+  // Unit “row”: status fields + overall (no extra notes)
+  doc.setTextColor(30, 30, 30);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
-  doc.text(`Unit ${unit.unit_code}`, ML, y);
-  y += 32;
+  doc.setFontSize(12.5);
+  doc.text(unitRowLine(unit), ML, y);
+  y += 14;
 
-  // Engineer line
-  if (zone.engineer) {
-    doc.setTextColor(...C.textMuted);
+  // Optional second line: AP patch panel ports (kept as part of the row if present)
+  if (unit.ap_patch_status) {
+    doc.setTextColor(90, 90, 90);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Engineer: ${zone.engineer}`, ML, y);
-    y += 14;
+    doc.setFontSize(10.2);
+    doc.text(unitRowAltLine(unit), ML, y);
+    y += 12;
   }
 
-  // Status fields grid (2 columns)
-  y += 6;
-  y = sectionTitle(doc, "Installation Status", y);
 
-  const fields = [
-    { label: "FortiGate", val: unit.fortigate_status },
-    { label: "FortiSwitch", val: unit.fortiswitch_status },
-    { label: "Access Points", val: unit.ap_status },
-    { label: "AP Patch Panel Ports", val: unit.ap_patch_status },
-    { label: "Overall Status", val: unit.overall_status },
-  ];
-
-  const colW = (CW - 12) / 2;
-  fields.forEach((f, i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const fx = ML + col * (colW + 12);
-    const fy = y + row * 52;
-
-    // Field background
-    doc.setFillColor(...C.lightGray);
-    doc.setDrawColor(...C.borderGray);
-    doc.setLineWidth(0.5);
-    doc.rect(fx, fy, colW, 52, "FD");
-
-    // Field label
-    doc.setTextColor(...C.textMuted);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(f.label, fx + 10, fy + 12);
-
-    // Status badge
-    drawStatusBadge(doc, f.val, fx + 10, fy + 32, colW - 20);
-  });
-
-  y += Math.ceil(fields.length / 2) * 52 + 14;
-
-  // Completion Summary
-  y = drawSummary(doc, fields, y);
-
-  // Notes section
-  if (unit.notes) {
-    y = sectionTitle(doc, "Notes", y);
-    doc.setTextColor(...C.textDark);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const noteLines = doc.splitTextToSize(unit.notes, CW - 20);
-    doc.text(noteLines, ML + 10, y);
-    y += noteLines.length * 12 + 12;
-  }
-
-  // Photos section
+  // Photos grid under the single line
   const photos = unit.photos || [];
-  if (photos.length) {
-    y = sectionTitle(doc, `Photos (${photos.length})`, y);
+  const hasPhotos = photos.length > 0;
 
-    const thumbW = 120;
-    const thumbH = 90;
-    const gap = 12;
+  if (hasPhotos) {
+    const thumbW = 160;
+    const thumbH = 110;
+    const gap = 10;
     const perRow = Math.max(1, Math.floor((CW + gap) / (thumbW + gap)));
+
+    // subtle divider line
+    doc.setDrawColor(210, 210, 210);
+    doc.setLineWidth(1);
+    doc.line(ML, y + 6, PW - ML, y + 6);
+    y += 18;
 
     let col = 0;
     for (const photo of photos) {
-      if (y + thumbH > PH - 80) {
-        drawFooter(doc, doc.internal.getCurrentPageInfo().pageNumber, "...");
+      if (y + thumbH > PH - 90) {
+        // finish current page footer later; just add a new page
         doc.addPage();
         drawHeader(doc, zone, `Unit ${unit.unit_code} - Photos`);
         y = 85;
+        // single-line again for context
+        doc.setTextColor(30, 30, 30);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text(`Unit ${unit.unit_code}`, ML, y);
+        y += 16;
         col = 0;
       }
 
       const px = ML + col * (thumbW + gap);
       const dataUrl = await loadImageAsDataUrl(photo.url);
+
+      // Monochrome photo placeholder
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.8);
+      doc.setFillColor(245, 245, 245);
+      doc.rect(px, y, thumbW, thumbH, "F");
+      doc.rect(px, y, thumbW, thumbH);
+
       if (dataUrl) {
         try {
           doc.addImage(dataUrl, "JPEG", px, y, thumbW, thumbH);
-        } catch (e) {
-          doc.setFillColor(...C.lightGray);
-          doc.rect(px, y, thumbW, thumbH, "F");
+        } catch {
+          // keep placeholder
         }
-      } else {
-        doc.setFillColor(...C.lightGray);
-        doc.rect(px, y, thumbW, thumbH, "F");
       }
 
       col++;
@@ -383,185 +381,109 @@ export async function exportUnitPdf(zone, unit) {
   doc.save(`NeoNova_Unit_${unit.unit_code}.pdf`);
 }
 
+
 // ============================================================
-// EXPORT: Full Zone PDF (per-unit detail pages)
+// EXPORT: Full Zone PDF (Clean: per-unit 1 line + photos only)
 // ============================================================
 export async function exportZonePdf(zone, units) {
   const doc = newDoc();
 
-  // Cover page
+  // Simple cover page (monochrome)
   drawHeader(doc, zone, "Zone Report");
   let y = 95;
 
-  // Title with accent color
-  doc.setTextColor(...C.headerBg);
+  doc.setTextColor(30, 30, 30);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(28);
+  doc.setFontSize(18);
   doc.text(`Zone ${zone.code}`, ML, y);
-  y += 40;
+  y += 18;
 
-  // Zone label
   if (zone.label) {
-    doc.setTextColor(...C.textDark);
+    doc.setTextColor(90, 90, 90);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(13);
+    doc.setFontSize(11);
     doc.text(zone.label, ML, y);
-    y += 22;
+    y += 16;
   }
 
-  // Engineer
   if (zone.engineer) {
-    doc.setTextColor(...C.textMuted);
+    doc.setTextColor(90, 90, 90);
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
     doc.text(`Engineer: ${zone.engineer}`, ML, y);
-    y += 18;
+    y += 16;
   }
 
-  // Date
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  doc.setTextColor(...C.textMuted);
-  doc.setFontSize(10);
-  doc.text(`Report Generated: ${dateStr}`, ML, y);
-  y += 28;
-
-  // Summary stats with better styling
-  const stats = {
-    total: units.length,
-    done: units.filter(u => u.overall_status === "done").length,
-    inProgress: units.filter(u => u.overall_status === "in_progress").length,
-    issue: units.filter(u => u.overall_status === "issue").length,
-    blocked: units.filter(u => u.overall_status === "blocked").length,
-  };
-  const completion = stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
-
-  const statItems = [
-    { label: "Total Units", val: stats.total, color: C.textDark },
-    { label: "Completed", val: stats.done, color: C.statusGreen },
-    { label: "In Progress", val: stats.inProgress, color: C.statusAmber },
-    { label: "Issues", val: stats.issue, color: C.statusRed },
-    { label: "Completion", val: `${completion}%`, color: C.headerBg },
-  ];
-
-  const statW = (CW + 12) / statItems.length;
-  statItems.forEach((item, i) => {
-    const sx = ML + i * statW;
-    // Card background
-    doc.setFillColor(...C.lightGray);
-    doc.setDrawColor(...C.borderGray);
-    doc.setLineWidth(0.5);
-    doc.rect(sx, y, statW - 6, 56, "FD");
-    
-    // Value
-    doc.setTextColor(...item.color);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text(String(item.val), sx + (statW - 6) / 2, y + 24, { align: "center" });
-    
-    // Label
-    doc.setTextColor(...C.textMuted);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.text(item.label, sx + (statW - 6) / 2, y + 45, { align: "center" });
-  });
-  y += 68;
-
-  // Per-unit detail pages
+  // Per-unit detail pages: 1 line summary + photos
   for (const unit of units) {
     doc.addPage();
     drawHeader(doc, zone, `Unit ${unit.unit_code}`);
     y = 85;
 
-    doc.setTextColor(...C.headerBg);
+    // Unit “row”: status fields + overall (no notes)
+    doc.setTextColor(30, 30, 30);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.text(`Unit ${unit.unit_code}`, ML, y);
-    y += 28;
+    doc.setFontSize(12.5);
+    doc.text(unitRowLine(unit), ML, y);
+    y += 14;
 
-    // Status grid
-    y = sectionTitle(doc, "Installation Status", y);
-    const statusFields = [
-      { label: "FortiGate", val: unit.fortigate_status },
-      { label: "FortiSwitch", val: unit.fortiswitch_status },
-      { label: "Access Points", val: unit.ap_status },
-      { label: "AP Patch", val: unit.ap_patch_status },
-      { label: "Overall Status", val: unit.overall_status },
-    ];
-
-    const sColW = (CW - 12) / 2;
-    statusFields.forEach((f, i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const fx = ML + col * (sColW + 12);
-      const fy = y + row * 50;
-
-      doc.setFillColor(...C.lightGray);
-      doc.setDrawColor(...C.borderGray);
-      doc.setLineWidth(0.5);
-      doc.rect(fx, fy, sColW, 50, "FD");
-
-      doc.setTextColor(...C.textMuted);
+    // Optional second line: AP patch panel ports
+    if (unit.ap_patch_status) {
+      doc.setTextColor(90, 90, 90);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(f.label, fx + 10, fy + 12);
-
-      drawStatusBadge(doc, f.val, fx + 10, fy + 32, sColW - 20);
-    });
-    y += Math.ceil(statusFields.length / 2) * 50 + 14;
-
-    // Completion Summary
-    y = drawSummary(doc, statusFields, y);
-
-    // Notes
-    if (unit.notes) {
-      y += 4;
-      y = sectionTitle(doc, "Notes", y);
-      doc.setTextColor(...C.textDark);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      const noteLines = doc.splitTextToSize(unit.notes, CW - 20);
-      doc.text(noteLines, ML + 10, y);
-      y += noteLines.length * 12 + 10;
+      doc.setFontSize(10.2);
+      doc.text(unitRowAltLine(unit), ML, y);
+      y += 12;
     }
 
-    // Photos
-    const photos = unit.photos || [];
-    if (photos.length) {
-      y += 4;
-      y = sectionTitle(doc, `Photos (${photos.length})`, y);
 
-      const thumbW = 115;
-      const thumbH = 86;
+    const photos = unit.photos || [];
+
+    if (photos.length) {
+      const thumbW = 145;
+      const thumbH = 100;
       const gap = 10;
       const perRow = Math.max(1, Math.floor((CW + gap) / (thumbW + gap)));
 
+      // divider
+      doc.setDrawColor(210, 210, 210);
+      doc.setLineWidth(1);
+      doc.line(ML, y + 6, PW - ML, y + 6);
+      y += 18;
+
       let col = 0;
       for (const photo of photos) {
-        if (y + thumbH > PH - 80) {
-          drawFooter(doc, doc.internal.getCurrentPageInfo().pageNumber, "...");
+        if (y + thumbH > PH - 90) {
           doc.addPage();
           drawHeader(doc, zone, `Unit ${unit.unit_code} - Photos`);
           y = 85;
+
+          // keep it minimal on continuation page
+          doc.setTextColor(30, 30, 30);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(14);
+          doc.text(`Unit ${unit.unit_code}`, ML, y);
+          y += 16;
+
           col = 0;
         }
 
         const px = ML + col * (thumbW + gap);
         const dataUrl = await loadImageAsDataUrl(photo.url);
+
+        // monochrome placeholder box
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.8);
+        doc.setFillColor(245, 245, 245);
+        doc.rect(px, y, thumbW, thumbH, "F");
+        doc.rect(px, y, thumbW, thumbH);
+
         if (dataUrl) {
           try {
             doc.addImage(dataUrl, "JPEG", px, y, thumbW, thumbH);
-          } catch (e) {
-            doc.setFillColor(...C.lightGray);
-            doc.rect(px, y, thumbW, thumbH, "F");
+          } catch {
+            // keep placeholder
           }
-        } else {
-          doc.setFillColor(...C.lightGray);
-          doc.rect(px, y, thumbW, thumbH, "F");
         }
 
         col++;
@@ -583,6 +505,7 @@ export async function exportZonePdf(zone, units) {
 
   doc.save(`NeoNova_Zone_${zone.code}_Report.pdf`);
 }
+
 
 // ============================================================
 // EXPORT: All Zones PDF
