@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neo Nova — Project Tracker</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<section id="loginScreen" class="screen login-screen">
+  <div class="login-grid"></div>
+  <div class="login-card">
+    <div class="brand-mark">
+      <span class="brand-bracket">[</span><span class="brand-name">NEO NOVA</span><span class="brand-bracket">]</span>
+    </div>
+    <h1>Sign In</h1>
+    <p class="login-hint">Field Installation & Follow-up Team Access</p>
+    <form id="loginForm">
+      <label>Email Address
+        <input type="email" id="loginEmail" required autocomplete="email" placeholder="name@neonova.com">
+      </label>
+      <label>Password
+        <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••">
+      </label>
+      <button type="submit" class="btn-primary" id="loginBtn">
+        <span class="btn-label">Sign In</span>
+      </button>
+      <p class="login-error" id="loginError" hidden></p>
+    </form>
+  </div>
+</section>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app" class="app-shell" hidden>
+
+  <header class="topbar">
+    <div class="topbar-brand" data-route="zones">
+      <span class="brand-bracket">[</span><span class="brand-name">NEO NOVA</span><span class="brand-bracket">]</span>
+    </div>
+    <nav class="topbar-crumbs" id="crumbs"></nav>
+    <div class="topbar-actions">
+      <span class="user-pill" id="userPill"></span>
+      <button class="btn-ghost" id="logoutBtn">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="main-area">
+
+    <!-- ---- ZONES LIST VIEW ---- -->
+    <section id="view-zones" class="view">
+      <div class="view-head">
+        <div>
+          <p class="eyebrow">Project</p>
+          <h1>Zones</h1>
+        </div>
+        <button class="btn-primary" id="addZoneBtn">+ New Zone</button>
+      </div>
+      <div class="zones-grid" id="zonesGrid"></div>
+    </section>
+
+    <!-- ---- UNITS LIST VIEW (inside a zone) ---- -->
+    <section id="view-units" class="view" hidden>
+      <div class="view-head">
+        <div>
+          <p class="eyebrow" id="zoneEngLabel">Engineer</p>
+          <h1 id="zoneTitle">—</h1>
+        </div>
+        <div class="view-head-actions">
+          <button class="btn-secondary" id="exportZonePdfBtn">⤓ Export Zone PDF</button>
+          <button class="btn-primary" id="addUnitBtn">+ New Unit</button>
+        </div>
+      </div>
+
+      <div class="stats-row" id="zoneStats"></div>
+
+      <div class="table-wrap">
+        <table class="units-table" id="unitsTable">
+          <thead>
+            <tr>
+              <th>Unit</th>
+              <th>🔥 FortiGate</th>
+              <th>🔀 FortiSwitch</th>
+              <th>📡 Access Points</th>
+              <th>🔌 AP Patch Panel Ports</th>
+              <th>🏁 Overall Status</th>
+              <th>📝 Notes</th>
+              <th>Photos</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="unitsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---- UNIT DETAIL VIEW ---- -->
+    <section id="view-unit" class="view" hidden>
+      <div class="view-head">
+        <div>
+          <p class="eyebrow" id="unitZoneLabel">Zone</p>
+          <h1 id="unitTitle">—</h1>
+        </div>
+        <div class="view-head-actions">
+          <button class="btn-secondary" id="exportUnitPdfBtn">⤓ Export PDF</button>
+        </div>
+      </div>
+
+      <div class="unit-detail-grid">
+        <div class="panel">
+          <h2 class="panel-title">Installation Status</h2>
+
+          <div class="status-field">
+            <label>🔥 FortiGate</label>
+            <select class="status-select" id="f_fortigate" data-field="fortigate_status"></select>
+          </div>
+          <div class="status-field">
+            <label>🔀 FortiSwitch</label>
+            <select class="status-select" id="f_fortiswitch" data-field="fortiswitch_status"></select>
+          </div>
+          <div class="status-field">
+            <label>📡 Access Points</label>
+            <select class="status-select" id="f_ap" data-field="ap_status"></select>
+          </div>
+          <div class="status-field">
+            <label>AP Patch Panel Ports</label>
+            <input type="text" id="f_ap_patch" placeholder="Port 12, Port 13, Port 14, Port 15" pattern="^Port \d{1,5}(, Port \d{1,5}){3,4}$" title="Enter 4 or 5 ports (e.g. Port 12, Port 13, Port 14, Port 15)">
+          </div>
+          <div class="status-field">
+            <label>🏁 Overall Status</label>
+            <select class="status-select" id="f_overall" data-field="overall_status"></select>
+          </div>
+          <div class="status-field">
+            <label>📝 Notes</label>
+            <textarea id="f_notes" rows="3" placeholder="Write any notes about this unit..."></textarea>
+          </div>
+          <div class="button-group">
+            <button class="btn-primary" id="saveUnitBtn">Save Changes</button>
+            <button class="btn-danger" id="deleteUnitBtn">Delete Unit</button>
+          </div>
+          <span class="save-indicator" id="saveIndicator"></span>
+        </div>
+
+        <div class="panel">
+          <h2 class="panel-title">Photos</h2>
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="photoInput" accept="image/*" multiple capture="environment" hidden>
+            <div class="upload-zone-inner">
+              <span class="upload-icon">📷</span>
+              <p>Tap to upload unit photos</p>
+              <p class="upload-hint">Supports direct camera capture or gallery upload from mobile</p>
+            </div>
+          </div>
+          <div class="photos-grid" id="photosGrid"></div>
+        </div>
+      </div>
+
+      <div class="panel history-panel">
+        <h2 class="panel-title">Update History</h2>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Modals -->
+<div id="modalOverlay" class="modal-overlay" hidden>
+  <div class="modal-box" id="modalBox"></div>
+</div>
+
+<!-- PDF export staging area (rendered offscreen, captured then removed) -->
+<div id="pdfStage" class="pdf-stage"></div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
