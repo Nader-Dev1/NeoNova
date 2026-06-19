@@ -305,106 +305,107 @@ function drawUnitsTable(doc, units, y) {
 }
 
 // ============================================================
-// UNIT DETAIL CARD  (status 2×2 grid + photos label)
+// UNIT DETAIL CARD  (status 2×2 grid)
 // ============================================================
 function drawUnitCard(doc, zone, unit, y) {
-  const cardH_header = 32;
-  const gridH        = 90;  
-  const cardPad      = 10;
+  // Fixed layout sizes (A4)
+  const cardH_header = 38;
+  const gridH        = 92;
+  const cardPad      = 12;
 
-  // Card outer border
+  // Outer border
   doc.setDrawColor(...C.borderGray);
   doc.setLineWidth(0.8);
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(ML, y, CW, cardH_header + gridH + cardPad * 2, 5, 5, "FD");
+  doc.roundedRect(ML, y, CW, cardH_header + gridH + cardPad * 2, 6, 6, "FD");
 
-  // Card header row
+  // Header background
   doc.setFillColor(250, 250, 250);
-  doc.roundedRect(ML, y, CW, cardH_header, 5, 5, "F");
-  // Bottom border of header
+  doc.roundedRect(ML, y, CW, cardH_header, 6, 6, "F");
+
+  // Header bottom line
   doc.setDrawColor(...C.borderGray);
-  doc.setLineWidth(0.5);
+  doc.setLineWidth(0.6);
   doc.line(ML, y + cardH_header, ML + CW, y + cardH_header);
 
-  // Zone label (left)
-doc.setFillColor(...sc);
-doc.roundedRect(
-  fx + 8,
-  fy + 6,
-  130,
-  cellH - 12,
-  4,
-  4,
-  "F"
-);
+  // Header content
+  const headerY = y + 24;
 
-doc.setTextColor(255,255,255);
-doc.setFont("helvetica", "bold");
-doc.setFontSize(9);
-doc.text(
-  statusLabel(field.val),
-  fx + 73,
-  fy + cellH / 2 + 3,
-  { align: "center" }
-);
+  // Overall status badge (left)
+  const overall = unit.overall_status;
+  const scBadge = statusColor(overall);
+  const badgeW = 165;
+  const badgeH = 24;
+  const badgeX = ML + 14;
+  const badgeY = y + (cardH_header - badgeH) / 2;
 
-  // Unit ID (right) — amber bold large
+  doc.setFillColor(...scBadge);
+  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 5, 5, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.text(statusLabel(overall), badgeX + badgeW / 2, badgeY + badgeH / 2 + 2, { align: "center" });
+
+  // Unit title (right)
   doc.setTextColor(...C.accent);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text(`Unit ${unit.unit_code}`, ML + CW - 14, y + 22, { align: "right" });
+  doc.text(`Unit ${unit.unit_code}`, ML + CW - 14, headerY, { align: "right" });
 
-  y += cardH_header + cardPad;
+  // Small notes preview (optional)
+  if (unit.notes) {
+    doc.setTextColor(...C.textMuted);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(String(unit.notes).slice(0, 50), ML + 14, y + cardH_header + 14, { maxWidth: CW - 28, align: "left" });
+  }
 
-  // 2×2 Status grid
-  const cellW = CW / 2 - 6;
-  const cellH = 30;
-  const gap   = 6;
+  // Grid start
+  let gy = y + cardH_header + cardPad;
+
+  const gapX = 10;
+  const gapY = 10;
+  const cellW = (CW - gapX) / 2 - 2;
+  const cellH = 34;
 
   const fields = [
-    { label: "FortiSwitch",   val: unit.fortiswitch_status },
-    { label: "FortiGate",     val: unit.fortigate_status },
-    { label: "Overall Status",val: unit.overall_status },
-    { label: "Access Points", val: unit.ap_status },
+    { label: "FortiGate",      val: unit.fortigate_status },
+    { label: "FortiSwitch",    val: unit.fortiswitch_status },
+    { label: "Access Points",  val: unit.ap_status },
+    { label: "Overall Status", val: unit.overall_status },
   ];
 
   fields.forEach((field, idx) => {
     const col = idx % 2;
     const row = Math.floor(idx / 2);
-    const fx  = ML + col * (cellW + gap * 2 + 4);
-    const fy  = y + row * (cellH + gap);
+
+    const fx = ML + col * (cellW + gapX);
+    const fy = gy + row * (cellH + gapY);
 
     const sc = statusColor(field.val);
 
-    // Cell border
+    // Colored cell
+    doc.setFillColor(...sc);
     doc.setDrawColor(...C.borderGray);
-    doc.setLineWidth(0.6);
-  doc.setFillColor(...sc);
-doc.roundedRect(
-  fx + 6,
-  fy + 6,
-  120,
-  cellH - 12,
-  4,
-  4,
-  "F"
-);
-doc.setTextColor(255,255,255);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(fx, fy, cellW, cellH, 5, 5, "F");
 
+    // Status name (left/center)
+    doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9.5);
-    doc.text(statusLabel(field.val), fx + 10, fy + cellH / 2 + 3.5);
+    doc.text(statusLabel(field.val), fx + 12, fy + cellH / 2 + 3, { baseline: "middle" });
 
-    // Field label (right, gray)
-    doc.setTextColor(...C.textMuted);
+    // Field label (right)
+    doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(field.label, fx + cellW - 8, fy + cellH / 2 + 3.5, { align: "right" });
+    doc.setFontSize(8.5);
+    doc.text(field.label, fx + cellW - 10, fy + cellH / 2 + 3, { align: "right", baseline: "middle" });
   });
 
-  y += gridH;
-
-  return y + cardPad;
+  // Return used height (exact)
+  const usedH = cardH_header + gridH + cardPad * 2;
+  return y + usedH;
 }
 
 // ============================================================
