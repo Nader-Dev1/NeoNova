@@ -262,21 +262,131 @@ function statusTextCompact(v) {
   return statusLabel(v);
 }
 
-
-function unitRowLine(unit) {
-  // B) Status fields only + Overall (no notes/AP patch ports field expansion required)
-  const fg = statusTextCompact(unit.fortigate_status);
-  const fs = statusTextCompact(unit.fortiswitch_status);
-  const ap = statusTextCompact(unit.ap_status);
-  const overall = statusTextCompact(unit.overall_status);
-  return `Unit ${unit.unit_code} | FG: ${fg} | FS: ${fs} | AP: ${ap} | Overall: ${overall}`;
+function pillTextForPdf(statusValue) {
+  // Use same statusLabel text, but without emoji to keep compact
+  const s = statusLabel(statusValue);
+  return s.replace(/^\p{Extended_Pictographic}\s*/u, "");
 }
 
-function unitRowAltLine(unit) {
-  // include AP patch panel ports if present
-  const ports = unit.ap_patch_status ? String(unit.ap_patch_status) : "—";
-  return `AP Patch Ports: ${ports}`;
+function drawCell(doc, x, y, w, h, opts = {}) {
+  const {
+    fill = null,
+    borderColor = [215, 220, 225],
+    textColor = [30, 40, 50],
+    fontSize = 10,
+    fontStyle = "bold",
+    align = "center",
+    padding = 6,
+    radius = 4,
+  } = opts;
+
+  if (fill) {
+    doc.setFillColor(...fill);
+    doc.roundedRect(x, y, w, h, radius, radius, "F");
+  }
+
+  doc.setDrawColor(...borderColor);
+  doc.setLineWidth(1);
+  doc.roundedRect(x, y, w, h, radius, radius);
+
+  doc.setTextColor(...textColor);
+  doc.setFont("helvetica", fontStyle);
+  doc.setFontSize(fontSize);
+
+  const text = opts.text ?? "—";
+  const tx = align === "left" ? x + padding : align === "right" ? x + w - padding : x + w / 2;
+
+  doc.text(text, tx, y + h / 2 + fontSize / 3, {
+    align,
+  });
 }
+
+
+
+function drawStatusBadgeCell(doc, statusKey, x, y, w, h) {
+  const color = statusColor(statusKey);
+  const label = pillTextForPdf(statusKey);
+
+  // Background tinted by status color (simple approach: use color at low intensity)
+  const bg = [
+    Math.round(color[0] * 0.15 + 245 * 0.85),
+    Math.round(color[1] * 0.15 + 245 * 0.85),
+    Math.round(color[2] * 0.15 + 245 * 0.85),
+  ];
+
+  drawCell(doc, x, y, w, h, {
+    fill: bg,
+    borderColor: color,
+    textColor: color,
+    fontSize: 9.3,
+    fontStyle: "bold",
+    align: "center",
+    radius: 3,
+    text: label || "—",
+  });
+}
+
+function drawUnitTableRow(doc, zone, unit, x, y, w, opts = {}) {
+  // Columns: Unit | FortiGate | FortiSwitch | Access Points | Overall
+  const colUnit = 70;
+  const colEach = 140;
+  const colOverall = Math.max(90, w - colUnit - colEach * 3);
+
+  const rowH = 28;
+
+  // Header strip inside row (light)
+  doc.setDrawColor(...C.borderGray);
+  doc.setLineWidth(1);
+
+  // Unit code cell
+  drawCell(doc, x, y, colUnit, rowH, {
+    fill: [245, 245, 245],
+    borderColor: C.accent,
+    textColor: C.headerBg,
+    fontSize: 11,
+    fontStyle: "bold",
+    align: "left",
+    radius: 4,
+    padding: 10,
+    text: `Unit ${unit.unit_code}`,
+  });
+
+  // Status cells
+  drawStatusBadgeCell(doc, unit.fortigate_status, x + colUnit, y, colEach, rowH);
+  drawStatusBadgeCell(doc, unit.fortiswitch_status, x + colUnit + colEach, y, colEach, rowH);
+  drawStatusBadgeCell(doc, unit.ap_status, x + colUnit + colEach * 2, y, colEach, rowH);
+
+  const overallX = x + colUnit + colEach * 3;
+  drawStatusBadgeCell(doc, unit.overall_status, overallX, y, colOverall, rowH);
+
+  // Notes row under the table (within the same “unit card” block)
+  const notesText = (unit.notes && String(unit.notes).trim()) ? String(unit.notes).trim() : "—";
+  const notesY = y + rowH + 8;
+  const notesH = 22;
+
+  doc.setFillColor(245, 245, 245);
+  doc.setDrawColor(...C.borderGray);
+  doc.setLineWidth(1);
+  doc.roundedRect(x, notesY, w, notesH, 4, 4, "F");
+  doc.roundedRect(x, notesY, w, notesH, 4, 4);
+
+  doc.setTextColor(...C.textDark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.text("Notes:", x + 10, notesY + notesH / 2 + 3);
+
+  doc.setTextColor(...C.textDark);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.3);
+
+  // Simple truncate (jsPDF text wrapping needs extra). Keep compact.
+  const maxChars = 85;
+  const short = notesText.length > maxChars ? notesText.slice(0, maxChars - 3) + "..." : notesText;
+  doc.text(short, x + 45, notesY + notesH / 2 + 3);
+
+  return { rowBottomY: notesY + notesH };
+}
+
 
 // ============================================================
 // EXPORT: Single Unit PDF (Compact row + photos under it)
@@ -290,21 +400,10 @@ export async function exportUnitPdf(zone, unit) {
 
   let y = 85;
 
-  // Unit “row”: status fields + overall (no extra notes)
-  doc.setTextColor(30, 30, 30);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12.5);
-  doc.text(unitRowLine(unit), ML, y);
-  y += 14;
+  // Professional compact table row + notes (like HTML reference)
+  const { rowBottomY } = drawUnitTableRow(doc, zone, unit, ML, y, CW, { apPatch: unit.ap_patch_status });
+  y = rowBottomY + 6;
 
-  // Optional second line: AP patch panel ports (kept as part of the row if present)
-  if (unit.ap_patch_status) {
-    doc.setTextColor(90, 90, 90);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10.2);
-    doc.text(unitRowAltLine(unit), ML, y);
-    y += 12;
-  }
 
 
   // Photos grid under the single line
@@ -416,21 +515,9 @@ export async function exportZonePdf(zone, units) {
     drawHeader(doc, zone, `Unit ${unit.unit_code}`);
     y = 85;
 
-    // Unit “row”: status fields + overall (no notes)
-    doc.setTextColor(30, 30, 30);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12.5);
-    doc.text(unitRowLine(unit), ML, y);
-    y += 14;
-
-    // Optional second line: AP patch panel ports
-    if (unit.ap_patch_status) {
-      doc.setTextColor(90, 90, 90);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10.2);
-      doc.text(unitRowAltLine(unit), ML, y);
-      y += 12;
-    }
+    // Professional compact table row + notes (like HTML reference)
+    const { rowBottomY } = drawUnitTableRow(doc, zone, unit, ML, y, CW, { apPatch: unit.ap_patch_status });
+    y = rowBottomY + 6;
 
 
     const photos = unit.photos || [];
